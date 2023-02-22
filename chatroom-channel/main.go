@@ -3,7 +3,7 @@ package main
 import (
 	"log"
 
-	"github.com/hhow09/chatroom-channel/server"
+	"github.com/hhow09/go-chatrooms/chatroom-channel/server"
 	"github.com/joho/godotenv"
 )
 

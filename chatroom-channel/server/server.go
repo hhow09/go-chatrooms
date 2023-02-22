@@ -5,12 +5,13 @@ import (
 	"os"
 
 	"github.com/gin-gonic/gin"
+	"github.com/hhow09/go-chatrooms/chatroom-channel/model"
 )
 
 type WsServer struct {
-	clients    map[*Client]bool
-	register   chan *Client
-	unregister chan *Client
+	clients    map[*model.Client]bool
+	register   chan *model.Client
+	unregister chan *model.Client
 	broadcast  chan []byte
 	router     *gin.Engine
 }
@@ -19,17 +20,15 @@ func NewWsServer() *WsServer {
 	router := gin.New()
 
 	s := &WsServer{
-		clients:    make(map[*Client]bool),
-		register:   make(chan *Client),
-		unregister: make(chan *Client),
+		clients:    make(map[*model.Client]bool),
+		register:   make(chan *model.Client),
+		unregister: make(chan *model.Client),
 		broadcast:  make(chan []byte),
 		router:     router,
 	}
 	s.router.GET("/ws", func(ctx *gin.Context) {
 		conn := WsHandler(ctx)
-		client := newClient(conn, s)
-		go client.readMessage()
-		go client.writePump()
+		client := model.NewClient(conn, s.unregister, s.broadcast)
 		if client != nil {
 			s.register <- client
 		}
@@ -59,20 +58,19 @@ func (s *WsServer) ListenToClientEvents() {
 	}
 }
 
-func (s *WsServer) registerClient(client *Client) {
+func (s *WsServer) registerClient(client *model.Client) {
 	fmt.Println("new client joined")
-	client.send <- []byte("welcome to the chatroom!")
 	s.broadcastToClients([]byte("new client joined"))
 	s.clients[client] = true
 }
 
-func (s *WsServer) unregisterClient(client *Client) {
+func (s *WsServer) unregisterClient(client *model.Client) {
 	fmt.Println("new client levaed")
 	delete(s.clients, client)
 }
 
 func (s *WsServer) broadcastToClients(message []byte) {
 	for client := range s.clients {
-		client.send <- message
+		client.Send(message)
 	}
 }

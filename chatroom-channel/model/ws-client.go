@@ -1,4 +1,4 @@
-package server
+package model
 
 import (
 	"fmt"
@@ -20,22 +20,26 @@ var (
 
 // Client represents the websocket client at the server
 type Client struct {
-	conn     *websocket.Conn // The actual websocket connection.
-	wsServer *WsServer
-	send     chan []byte
+	conn       *websocket.Conn // The actual websocket connection.
+	send       chan []byte
+	unregister chan *Client // WsServer.unregister chan
+	broadcast  chan []byte  // WsServer.broadcast chan
 }
 
-func newClient(conn *websocket.Conn, wsServer *WsServer) *Client {
-	return &Client{
-		conn:     conn,
-		wsServer: wsServer,
-		send:     make(chan []byte, 256),
+func NewClient(conn *websocket.Conn, unregister chan *Client, broadcast chan []byte) *Client {
+	client := &Client{
+		conn:       conn,
+		unregister: unregister,
+		broadcast:  broadcast,
+		send:       make(chan []byte, 256),
 	}
-
+	go client.readMessage()
+	go client.writePump()
+	return client
 }
 
 func (client *Client) disconnect() {
-	client.wsServer.unregister <- client
+	client.unregister <- client
 	close(client.send)
 	client.conn.Close()
 }
@@ -60,7 +64,7 @@ func (c *Client) readMessage() {
 			}
 			break
 		}
-		c.wsServer.broadcast <- msg
+		c.broadcast <- msg
 	}
 }
 
@@ -106,4 +110,8 @@ func (c *Client) writePump() {
 		}
 
 	}
+}
+
+func (c *Client) Send(msg []byte) {
+	c.send <- msg
 }
