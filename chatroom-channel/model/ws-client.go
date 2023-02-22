@@ -24,10 +24,12 @@ type Client struct {
 	send       chan []byte
 	unregister chan *Client // WsServer.unregister chan
 	broadcast  chan []byte  // WsServer.broadcast chan
+	Name       string
 }
 
-func NewClient(conn *websocket.Conn, unregister chan *Client, broadcast chan []byte) *Client {
+func NewClient(conn *websocket.Conn, unregister chan *Client, broadcast chan []byte, name string) *Client {
 	client := &Client{
+		Name:       name,
 		conn:       conn,
 		unregister: unregister,
 		broadcast:  broadcast,
@@ -114,4 +116,8 @@ func (c *Client) writePump() {
 
 func (c *Client) Send(msg []byte) {
 	c.send <- msg
+}
+
+func (c *Client) GetName() string {
+	return c.Name
 }

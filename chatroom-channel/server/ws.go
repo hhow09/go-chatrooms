@@ -15,11 +15,16 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
-func WsHandler(ctx *gin.Context) *websocket.Conn {
+func WsHandler(ctx *gin.Context) (*websocket.Conn, string) {
+	name, ok := ctx.Request.URL.Query()["name"]
+	if !ok || len(name[0]) < 1 {
+		log.Println("Url Param 'name' is missing")
+		return nil, ""
+	}
 	conn, err := upgrader.Upgrade(ctx.Writer, ctx.Request, nil)
 	if err != nil {
 		log.Println(err)
-		return nil
+		return nil, ""
 	}
-	return conn
+	return conn, name[0]
 }

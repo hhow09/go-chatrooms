@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"strings"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -21,14 +22,22 @@ func init() {
 	godotenv.Load()
 }
 
+func inputNamePrompt() string {
+	reader := bufio.NewReader(os.Stdin)
+	fmt.Print("> Enter username: ")
+	text, _ := reader.ReadString('\n')
+	return strings.Trim(text, " \n")
+}
+
 func main() {
 	flag.Parse()
 	log.SetFlags(0)
 
+	name := inputNamePrompt()
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt)
 
-	u := url.URL{Scheme: "ws", Host: fmt.Sprintf("localhost:%s", os.Getenv("WEB_HOST")), Path: "/ws"}
+	u := url.URL{Scheme: "ws", Host: fmt.Sprintf("localhost:%s", os.Getenv("WEB_HOST")), Path: "/ws", RawQuery: fmt.Sprintf("name=%s", name)}
 	log.Printf("connecting to %s", u.String())
 
 	c, _, err := websocket.DefaultDialer.Dial(u.String(), nil)

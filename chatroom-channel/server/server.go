@@ -27,8 +27,8 @@ func NewWsServer() *WsServer {
 		router:     router,
 	}
 	s.router.GET("/ws", func(ctx *gin.Context) {
-		conn := WsHandler(ctx)
-		client := model.NewClient(conn, s.unregister, s.broadcast)
+		conn, name := WsHandler(ctx)
+		client := model.NewClient(conn, s.unregister, s.broadcast, name)
 		if client != nil {
 			s.register <- client
 		}
@@ -59,8 +59,9 @@ func (s *WsServer) ListenToClientEvents() {
 }
 
 func (s *WsServer) registerClient(client *model.Client) {
-	fmt.Println("new client joined")
-	s.broadcastToClients([]byte("new client joined"))
+	msg := fmt.Sprintf("new client joined: %s", client.GetName())
+	fmt.Println(msg)
+	s.broadcastToClients([]byte(msg))
 	s.clients[client] = true
 }
 
