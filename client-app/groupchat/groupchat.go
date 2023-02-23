@@ -1,53 +1,47 @@
-//go:build ignore
-// +build ignore
-
-package main
+package groupchat
 
 import (
-	"bufio"
 	"flag"
 	"fmt"
 	"log"
 	"net/url"
 	"os"
 	"os/signal"
-	"strings"
 	"time"
 
+	"github.com/eiannone/keyboard"
 	"github.com/gorilla/websocket"
-	"github.com/joho/godotenv"
+	"github.com/hhow09/go-chatrooms/client-app/input"
 )
 
-func init() {
-	godotenv.Load()
-}
+func GroupChatProgram(username string) {
+	// init keyboard reader
+	if err := keyboard.Open(); err != nil {
+		panic(err)
+	}
+	defer func() {
+		_ = keyboard.Close()
+	}()
 
-func inputNamePrompt() string {
-	reader := bufio.NewReader(os.Stdin)
-	fmt.Print("> Enter username: ")
-	text, _ := reader.ReadString('\n')
-	return strings.Trim(text, " \n")
-}
-
-func main() {
 	flag.Parse()
 	log.SetFlags(0)
 
-	name := inputNamePrompt()
+	// exit sig
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt)
 
-	u := url.URL{Scheme: "ws", Host: fmt.Sprintf("localhost:%s", os.Getenv("WEB_HOST")), Path: "/ws", RawQuery: fmt.Sprintf("name=%s", name)}
+	u := url.URL{Scheme: "ws", Host: fmt.Sprintf("localhost:%s", os.Getenv("WEB_HOST")), Path: "/ws", RawQuery: fmt.Sprintf("name=%s", username)}
 	log.Printf("connecting to %s", u.String())
 
 	c, _, err := websocket.DefaultDialer.Dial(u.String(), nil)
 	if err != nil {
-		log.Fatal("dial:", err)
+		panic(fmt.Sprintf("dial:%v", err))
 	}
 	defer c.Close()
 
 	done := make(chan struct{})
 
+	// receive message from ws
 	go func() {
 		defer close(done)
 		for {
@@ -63,16 +57,18 @@ func main() {
 		}
 	}()
 
-	ichan := getInputReader()
-	ticker := time.NewTicker(time.Second)
+	// input reader
+	ichan := input.NewInput(interrupt, []keyboard.Key{keyboard.KeyEsc, keyboard.KeyCtrlC})
+
+	ticker := time.NewTicker(time.Second) // heartbeat timer
 	defer ticker.Stop()
 
 	for {
 		select {
 		case <-done:
 			return
-		case msg := <-ichan:
-			err := c.WriteMessage(websocket.TextMessage, []byte(msg))
+		case input := <-ichan:
+			err := c.WriteMessage(websocket.TextMessage, []byte(input))
 			if err != nil {
 				log.Println("write:", err)
 				return
@@ -84,8 +80,6 @@ func main() {
 				return
 			}
 		case <-interrupt:
-			log.Println("interrupt")
-
 			// Cleanly close the connection by sending a close message and then
 			// waiting (with timeout) for the server to close the connection.
 			err := c.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
@@ -100,21 +94,4 @@ func main() {
 			return
 		}
 	}
-}
-
-// read input from stdin
-func getInputReader() chan string {
-	readerChan := make(chan string)
-	go func() {
-		reader := bufio.NewReader(os.Stdin)
-		for {
-			data, _, err := reader.ReadLine()
-			if err != nil {
-				fmt.Printf("readline error: %v", err)
-				return
-			}
-			readerChan <- string(data)
-		}
-	}()
-	return readerChan
 }
