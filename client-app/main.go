@@ -23,17 +23,17 @@ const (
 // the questions to ask
 var qs = []*survey.Question{
 	{
-		Name:     "username",
-		Prompt:   &survey.Input{Message: "please input username"},
-		Validate: survey.Required,
-	},
-	{
 		Name: "program",
 		Prompt: &survey.Select{
 			Message: "Choose a program:",
 			Options: []string{GROUP_CHAT, PRIVATE_CHAT},
 			Default: GROUP_CHAT,
 		},
+	},
+	{
+		Name:     "username",
+		Prompt:   &survey.Input{Message: "please input username"},
+		Validate: survey.Required,
 	},
 }
 
@@ -43,6 +43,7 @@ type Ans struct {
 }
 
 func main() {
+	// recover from failed program
 	defer func() {
 		if err := recover(); err != nil {
 			fmt.Println("program error happened:", err)
@@ -62,7 +63,7 @@ func main() {
 			return
 		}
 		if answers.Program == GROUP_CHAT {
-			groupchat.GroupChatProgram(answers.UserName)
+			groupchat.GroupChatProgram(answers.UserName, "test-room")
 		}
 		if answers.Program == PRIVATE_CHAT {
 			fmt.Println("WIP")

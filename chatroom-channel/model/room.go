@@ -4,74 +4,74 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
+	"github.com/hhow09/go-chatrooms/chatroom-channel/util"
 )
 
-const welcomeMessage = "%s joined the room"
+const welcomeMessage = "%s joined the room [%s]. currently %d user in room."
+const leavRoomMessage = "%s leaved the room [%s]. currently %d user in room."
 
 type Room struct {
-	ID         uuid.UUID `json:"id"`
-	Name       string    `json:"name"`
-	clients    map[*Client]bool
-	register   chan *Client
-	unregister chan *Client
-	broadcast  chan *Message
-	Private    bool
+	ID        uuid.UUID `json:"id"`
+	Name      string    `json:"name"`
+	clients   map[*Client]bool
+	Broadcast chan Message
+	Private   bool
 }
 
 // NewRoom creates a new Room
 func NewRoom(name string, private bool) *Room {
 	return &Room{
-		Name:       name,
-		clients:    make(map[*Client]bool),
-		register:   make(chan *Client),
-		unregister: make(chan *Client),
-		broadcast:  make(chan *Message),
-		Private:    private,
+		ID:        uuid.New(),
+		Name:      name,
+		clients:   make(map[*Client]bool),
+		Broadcast: make(chan Message),
+		Private:   private,
 	}
 }
 
 // RunRoom runs our room, accepting various requests
 func (room *Room) Run() {
 	for {
-		select {
-
-		case client := <-room.register:
-			room.registerClientInRoom(client)
-
-		case client := <-room.unregister:
-			room.unregisterClientInRoom(client)
-
-		case message := <-room.broadcast:
-			room.broadcastToClientsInRoom(message.encode())
-		}
-
+		message := <-room.Broadcast
+		room.BroadcastToClientsInRoom(message)
 	}
 }
 
-func (room *Room) registerClientInRoom(client *Client) {
-	room.notifyClientJoined(client)
+// add client to the room
+// then client can receivent the room broadcast
+func (room *Room) RegisterClientInRoom(client *Client, isNewRoom bool) {
+	util.Log("Room.registerClientInRoom")
 	room.clients[client] = true
+	room.NotifyClientJoined(client, isNewRoom)
 }
 
-func (room *Room) unregisterClientInRoom(client *Client) {
-	if _, ok := room.clients[client]; ok {
-		delete(room.clients, client)
-	}
+// remove client from the room
+func (room *Room) UnregisterClientInRoom(client *Client) {
+	delete(room.clients, client)
+	room.BroadcastToClientsInRoom(Message{Message: fmt.Sprintf(leavRoomMessage, client.Name, room.Name, len(room.clients)), Action: LeaveRoomAction})
 }
 
-func (room *Room) broadcastToClientsInRoom(message []byte) {
+// broadcast to all client in room
+func (room *Room) BroadcastToClientsInRoom(message Message) {
+	util.Log("Room.BroadcastToClientsInRoom", message.Message)
 	for client := range room.clients {
-		client.Send(message)
+		client.Send(message.encode())
 	}
 }
 
-func (room *Room) notifyClientJoined(client *Client) {
-	msg := &Message{
-		Action:  SendMessageAction,
-		Target:  room,
-		Message: fmt.Sprintf(welcomeMessage, client.GetName()),
+// send notification to all clients in room that new client has joined.
+func (room *Room) NotifyClientJoined(client *Client, isNewRoom bool) {
+	content := fmt.Sprintf(welcomeMessage, client.GetName(), room.Name, len(room.clients))
+	if isNewRoom {
+		content = "new room created. \n" + content
 	}
-	room.broadcastToClientsInRoom(msg.encode())
+	msg := Message{
+		Action:  JoinRoomSuccessAction,
+		Target:  room.Name,
+		Message: content,
+		Sender:  SenderServer,
+	}
+	room.BroadcastToClientsInRoom(msg)
 }
 
 func (room *Room) GetName() string {

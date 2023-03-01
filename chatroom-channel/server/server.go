@@ -6,29 +6,38 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/hhow09/go-chatrooms/chatroom-channel/model"
+	"github.com/hhow09/go-chatrooms/chatroom-channel/util"
 )
 
 type WsServer struct {
-	clients    map[*model.Client]bool
-	register   chan *model.Client
-	unregister chan *model.Client
-	broadcast  chan []byte
-	router     *gin.Engine
+	clientMap   map[string]*model.Client // name -> *Client
+	register    chan *model.Client
+	unregister  chan *model.Client
+	broadcast   chan model.Message
+	roomActions chan model.Message
+	router      *gin.Engine
+	roomMap     map[string]*model.Room
 }
 
 func NewWsServer() *WsServer {
 	router := gin.New()
 
 	s := &WsServer{
-		clients:    make(map[*model.Client]bool),
-		register:   make(chan *model.Client),
-		unregister: make(chan *model.Client),
-		broadcast:  make(chan []byte),
-		router:     router,
+		clientMap:   map[string]*model.Client{},
+		register:    make(chan *model.Client),
+		unregister:  make(chan *model.Client),
+		broadcast:   make(chan model.Message),
+		roomActions: make(chan model.Message),
+		router:      router,
+		roomMap:     map[string]*model.Room{},
 	}
 	s.router.GET("/ws", func(ctx *gin.Context) {
 		conn, name := WsHandler(ctx)
-		client := model.NewClient(conn, s.unregister, s.broadcast, name)
+		if _, ok := s.clientMap[name]; ok {
+			// TODO handle duplicate client error
+			conn.Close()
+		}
+		client := model.NewClient(conn, s.unregister, s.broadcast, name, s.roomActions)
 		if client != nil {
 			s.register <- client
 		}
@@ -52,7 +61,9 @@ func (s *WsServer) ListenToClientEvents() {
 		case client := <-s.unregister:
 			s.unregisterClient(client)
 		case msg := <-s.broadcast:
-			s.broadcastToClients(msg)
+			s.broadcastToRoom(msg)
+		case msg := <-s.roomActions:
+			s.handleRoomActions(msg)
 		}
 
 	}
@@ -60,18 +71,58 @@ func (s *WsServer) ListenToClientEvents() {
 
 func (s *WsServer) registerClient(client *model.Client) {
 	msg := fmt.Sprintf("new client joined: %s", client.GetName())
-	fmt.Println(msg)
-	s.broadcastToClients([]byte(msg))
-	s.clients[client] = true
+	util.Log(msg)
+	s.clientMap[client.Name] = client
 }
 
 func (s *WsServer) unregisterClient(client *model.Client) {
-	fmt.Println("new client levaed")
-	delete(s.clients, client)
+	util.Log("new client levaed")
+	delete(s.clientMap, client.Name)
 }
 
-func (s *WsServer) broadcastToClients(message []byte) {
-	for client := range s.clients {
-		client.Send(message)
+func (s *WsServer) broadcastToRoom(message model.Message) {
+	room, ok := s.roomMap[message.Target]
+	if !ok {
+		fmt.Println("cannot find room: ", message.Target)
 	}
+	_, ok = s.clientMap[message.Sender]
+	if !ok {
+		fmt.Println("cannot find sender (client): ", message.Sender)
+	}
+	room.Broadcast <- message
+}
+
+func (s *WsServer) handleRoomActions(message model.Message) {
+	util.Log("wsServer handleRoomActions")
+	switch message.Action {
+	case model.JoinRoomAction:
+		client, ok := s.clientMap[message.Sender]
+		if !ok {
+			util.Log("client not exist", client.Name)
+			return
+		}
+		if room, ok := s.roomMap[message.Target]; ok {
+			// room exist
+			util.Log("JoinRoomAction, existing room, client", client.Name)
+			room.RegisterClientInRoom(client, false) // add client to room
+			client.Room = room
+		} else {
+			// create room
+			util.Log("wsServer JoinRoomAction, creating room")
+			room := s.createRoom(message.Target, false)
+			room.RegisterClientInRoom(client, true)
+			client := s.clientMap[message.Sender]
+			client.Room = room
+			util.Log("wsServer create room sucess")
+		}
+		// notify client joined
+		client.ServerNotify <- "join room success"
+	}
+}
+
+func (s *WsServer) createRoom(name string, private bool) *model.Room {
+	room := model.NewRoom(name, private)
+	go room.Run()
+	s.roomMap[room.Name] = room
+	return room
 }

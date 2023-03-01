@@ -11,9 +11,7 @@ type Action string
 const (
 	SendMessageAction     Action = "send-message"
 	JoinRoomAction        Action = "join-room"
-	LeaveRoomAction       Action = "leave-room"
 	JoinRoomSuccessAction Action = "join-room-success"
-	SenderServer                 = "server"
 )
 
 type Message struct {
@@ -23,7 +21,7 @@ type Message struct {
 	Sender  string `json:"sender"`
 }
 
-func (m *Message) encode() []byte {
+func (m *Message) Encode() []byte {
 	json, err := json.Marshal(m)
 	if err != nil {
 		fmt.Println(err)
@@ -38,4 +36,22 @@ func Decode(m []byte) (Message, error) {
 		return Message{}, err
 	}
 	return message, nil
+}
+
+func NewTextMessage(username, content, room string) *Message {
+	return &Message{
+		Action:  SendMessageAction,
+		Message: content,
+		Target:  room,
+		Sender:  username,
+	}
+}
+
+func NewJoinRoomMessage(username, room string) *Message {
+	return &Message{
+		Action:  JoinRoomAction,
+		Target:  room,
+		Sender:  username,
+		Message: "",
+	}
 }

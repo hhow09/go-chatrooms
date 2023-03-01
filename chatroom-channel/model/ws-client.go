@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/hhow09/go-chatrooms/chatroom-channel/util"
 )
 
 const (
@@ -20,20 +21,25 @@ var (
 
 // Client represents the websocket client at the server
 type Client struct {
-	conn       *websocket.Conn // The actual websocket connection.
-	send       chan []byte
-	unregister chan *Client // WsServer.unregister chan
-	broadcast  chan []byte  // WsServer.broadcast chan
-	Name       string
+	conn         *websocket.Conn // The actual websocket connection.
+	send         chan []byte
+	unregister   chan *Client // send unregister notification to server
+	broadcast    chan Message // send broadcast notification to server
+	roomActions  chan Message // send room action to server
+	ServerNotify chan string  // receive notification from server
+	Name         string
+	Room         *Room // a client can only join one room
 }
 
-func NewClient(conn *websocket.Conn, unregister chan *Client, broadcast chan []byte, name string) *Client {
+func NewClient(conn *websocket.Conn, unregister chan *Client, broadcast chan Message, name string, roomActions chan Message) *Client {
 	client := &Client{
-		Name:       name,
-		conn:       conn,
-		unregister: unregister,
-		broadcast:  broadcast,
-		send:       make(chan []byte, 256),
+		Name:         name,
+		conn:         conn,
+		unregister:   unregister,
+		broadcast:    broadcast,
+		send:         make(chan []byte, 256),
+		ServerNotify: make(chan string),
+		roomActions:  roomActions,
 	}
 	go client.readMessage()
 	go client.writePump()
@@ -41,8 +47,9 @@ func NewClient(conn *websocket.Conn, unregister chan *Client, broadcast chan []b
 }
 
 func (client *Client) disconnect() {
-	client.unregister <- client
-	close(client.send)
+	client.unregister <- client                // unregister client from server
+	client.Room.UnregisterClientInRoom(client) // unregister  client from room
+	client.send = nil                          // deactivate the channel
 	client.conn.Close()
 }
 
@@ -56,17 +63,17 @@ func (c *Client) readMessage() {
 		c.conn.SetReadDeadline(time.Now().Add(pongWait)) // update the wait time
 		return nil
 	})
-
 	for {
+		util.Log("client readMessage")
 		_, msg, err := c.conn.ReadMessage()
-		fmt.Printf("received message: %v\n", string(msg))
+		util.Log(fmt.Sprintf("received message: %s\n", string(msg)))
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
 				fmt.Printf("unexpected close error: %v", err)
 			}
 			break
 		}
-		c.broadcast <- msg
+		c.handleNewMessage(msg)
 	}
 }
 
@@ -120,4 +127,26 @@ func (c *Client) Send(msg []byte) {
 
 func (c *Client) GetName() string {
 	return c.Name
+}
+
+func (c *Client) handleNewMessage(rawMessage []byte) {
+	message, err := Decode(rawMessage)
+	if err != nil {
+		fmt.Println("decode error", err)
+		return
+	}
+
+	message.Sender = c.Name
+
+	switch message.Action {
+	case SendMessageAction:
+		c.broadcast <- message
+	case JoinRoomAction:
+		c.handleJoinRoomMessage(message)
+	}
+}
+
+func (c *Client) handleJoinRoomMessage(msg Message) {
+	c.roomActions <- msg
+	util.Log(<-c.ServerNotify)
 }

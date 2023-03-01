@@ -12,9 +12,10 @@ import (
 	"github.com/eiannone/keyboard"
 	"github.com/gorilla/websocket"
 	"github.com/hhow09/go-chatrooms/client-app/input"
+	"github.com/hhow09/go-chatrooms/client-app/model"
 )
 
-func GroupChatProgram(username string) {
+func GroupChatProgram(username string, room string) {
 	// init keyboard reader
 	if err := keyboard.Open(); err != nil {
 		panic(err)
@@ -30,6 +31,7 @@ func GroupChatProgram(username string) {
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt)
 
+	// setup ws connection
 	u := url.URL{Scheme: "ws", Host: fmt.Sprintf("localhost:%s", os.Getenv("WEB_HOST")), Path: "/ws", RawQuery: fmt.Sprintf("name=%s", username)}
 	log.Printf("connecting to %s", u.String())
 
@@ -41,6 +43,11 @@ func GroupChatProgram(username string) {
 
 	done := make(chan struct{})
 
+	// join room
+	err = joinRoom(c, username, room)
+	if err != nil {
+		panic(fmt.Sprintf("join room failed %v", err))
+	}
 	// receive message from ws
 	go func() {
 		defer close(done)
@@ -53,7 +60,7 @@ func GroupChatProgram(username string) {
 				fmt.Println("err:", err)
 				return
 			}
-			fmt.Printf("recv: %s\n", message)
+			handleReceiveMessage(message)
 		}
 	}()
 
@@ -67,19 +74,19 @@ func GroupChatProgram(username string) {
 		select {
 		case <-done:
 			return
-		case input := <-ichan:
-			err := c.WriteMessage(websocket.TextMessage, []byte(input))
+		case input := <-ichan: // input
+			err := c.WriteMessage(websocket.TextMessage, model.NewTextMessage(username, input, room).Encode())
 			if err != nil {
 				log.Println("write:", err)
 				return
 			}
-		case t := <-ticker.C:
+		case t := <-ticker.C: //heartbeat
 			err := c.WriteMessage(websocket.PingMessage, []byte(t.String()))
 			if err != nil {
 				log.Println("heartbeat error:", err)
 				return
 			}
-		case <-interrupt:
+		case <-interrupt: //os interrupt
 			// Cleanly close the connection by sending a close message and then
 			// waiting (with timeout) for the server to close the connection.
 			err := c.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
@@ -94,4 +101,34 @@ func GroupChatProgram(username string) {
 			return
 		}
 	}
+}
+
+// send join room action to server and wait for response
+func joinRoom(c *websocket.Conn, username, room string) error {
+	c.WriteMessage(websocket.TextMessage, model.NewJoinRoomMessage(username, room).Encode())
+
+	fmt.Println("wait for server response...")
+	_, resp, err := c.ReadMessage()
+	if err != nil {
+		fmt.Println("err: ", err, resp)
+		return err
+	}
+	msg, err := model.Decode(resp)
+	if err != nil {
+		fmt.Println("error decoding message", err)
+	}
+	if msg.Action == model.JoinRoomSuccessAction {
+		handleReceiveMessage(resp)
+		return nil
+	}
+	return fmt.Errorf("unexpcted response %v", msg)
+}
+
+// display default message on screen
+func handleReceiveMessage(rawMessage []byte) {
+	msg, err := model.Decode(rawMessage)
+	if err != nil {
+		fmt.Println("error decoding message", err)
+	}
+	fmt.Printf("From %s: %s\n", msg.Sender, msg.Message)
 }
