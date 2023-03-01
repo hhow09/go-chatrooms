@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strings"
 
 	"github.com/hhow09/go-chatrooms/client-app/groupchat"
 	"github.com/joho/godotenv"
@@ -23,17 +24,21 @@ const (
 // the questions to ask
 var qs = []*survey.Question{
 	{
-		Name:     "username",
-		Prompt:   &survey.Input{Message: "please input username"},
-		Validate: survey.Required,
-	},
-	{
 		Name: "program",
 		Prompt: &survey.Select{
 			Message: "Choose a program:",
 			Options: []string{GROUP_CHAT, PRIVATE_CHAT},
 			Default: GROUP_CHAT,
 		},
+	},
+	{
+		Name:     "username",
+		Prompt:   &survey.Input{Message: "please input username"},
+		Validate: survey.Required,
+		Transform: survey.TransformString(func(s string) string {
+			transformed := strings.Replace(s, " ", "-", -1) // replace whitespace with dash
+			return transformed
+		}),
 	},
 }
 
@@ -43,6 +48,7 @@ type Ans struct {
 }
 
 func main() {
+	// recover from failed program
 	defer func() {
 		if err := recover(); err != nil {
 			fmt.Println("program error happened:", err)
