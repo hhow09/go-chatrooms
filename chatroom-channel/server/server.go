@@ -42,6 +42,14 @@ func NewWsServer() *WsServer {
 			s.register <- client
 		}
 	})
+	s.router.GET("/rooms", func(ctx *gin.Context) {
+		rooms := make([]string, 0, len(s.roomMap))
+		for roomName := range s.roomMap {
+			rooms = append(rooms, roomName)
+		}
+
+		ctx.JSON(200, rooms)
+	})
 	return s
 }
 

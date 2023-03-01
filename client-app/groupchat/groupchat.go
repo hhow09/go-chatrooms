@@ -1,9 +1,12 @@
 package groupchat
 
 import (
+	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
+	"net/http"
 	"net/url"
 	"os"
 	"os/signal"
@@ -15,7 +18,29 @@ import (
 	"github.com/hhow09/go-chatrooms/client-app/model"
 )
 
-func GroupChatProgram(username string, room string) {
+func getRoomList() ([]string, error) {
+	u := url.URL{Scheme: "http", Host: fmt.Sprintf("localhost:%s", os.Getenv("WEB_HOST")), Path: "/rooms"}
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, u.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	if res.StatusCode != 200 {
+		return nil, fmt.Errorf("Non-OK HTTP status: %v", res.StatusCode)
+	}
+	defer res.Body.Close()
+	var rommlist []string
+	err = json.NewDecoder(res.Body).Decode(&rommlist)
+	if err != nil {
+		return nil, err
+	}
+	return rommlist, nil
+}
+
+func GroupChatProgram(username string) {
 	// init keyboard reader
 	if err := keyboard.Open(); err != nil {
 		panic(err)
@@ -40,6 +65,15 @@ func GroupChatProgram(username string, room string) {
 		panic(fmt.Sprintf("dial:%v", err))
 	}
 	defer c.Close()
+
+	var room string
+	roomList, _ := getRoomList()
+	ans1 := ChooseRoomPrompt(roomList)
+	if ans1.Room == OPTION_CREATE_ROOM || ans1.Room == "" {
+		room = CreateRoomPrompt().Room
+	} else {
+		room = ans1.Room
+	}
 
 	done := make(chan struct{})
 

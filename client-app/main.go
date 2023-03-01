@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strings"
 
 	"github.com/hhow09/go-chatrooms/client-app/groupchat"
 	"github.com/joho/godotenv"
@@ -34,6 +35,10 @@ var qs = []*survey.Question{
 		Name:     "username",
 		Prompt:   &survey.Input{Message: "please input username"},
 		Validate: survey.Required,
+		Transform: survey.TransformString(func(s string) string {
+			transformed := strings.Replace(s, " ", "-", -1) // replace whitespace with dash
+			return transformed
+		}),
 	},
 }
 
@@ -63,7 +68,7 @@ func main() {
 			return
 		}
 		if answers.Program == GROUP_CHAT {
-			groupchat.GroupChatProgram(answers.UserName, "test-room")
+			groupchat.GroupChatProgram(answers.UserName)
 		}
 		if answers.Program == PRIVATE_CHAT {
 			fmt.Println("WIP")
