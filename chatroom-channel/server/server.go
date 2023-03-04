@@ -33,10 +33,6 @@ func NewWsServer() *WsServer {
 	}
 	s.router.GET("/ws", func(ctx *gin.Context) {
 		conn, name := WsHandler(ctx)
-		if _, ok := s.clientMap[name]; ok {
-			// TODO handle duplicate client error
-			conn.Close()
-		}
 		client := model.NewClient(conn, s.unregister, s.broadcast, name, s.roomActions)
 		if client != nil {
 			s.register <- client
@@ -79,6 +75,11 @@ func (s *WsServer) ListenToClientEvents() {
 
 func (s *WsServer) registerClient(client *model.Client) {
 	msg := fmt.Sprintf("new client joined: %s", client.GetName())
+	if _, ok := s.clientMap[client.Name]; ok {
+		// TODO handle duplicate client error
+		client.CloseConn()
+		return
+	}
 	util.Log(msg)
 	s.clientMap[client.Name] = client
 }

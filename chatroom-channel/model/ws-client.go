@@ -46,6 +46,10 @@ func NewClient(conn *websocket.Conn, unregister chan *Client, broadcast chan Mes
 	return client
 }
 
+func (client *Client) CloseConn() {
+	client.conn.Close()
+}
+
 func (client *Client) disconnect() {
 	client.unregister <- client                // unregister client from server
 	client.Room.UnregisterClientInRoom(client) // unregister  client from room
