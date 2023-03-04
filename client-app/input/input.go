@@ -9,7 +9,7 @@ import (
 )
 
 // restore the cursor position and clear the line
-func clearLine() {
+func ClearLine() {
 	fmt.Print("\033[u\033[K")
 }
 
@@ -18,14 +18,14 @@ type Input struct {
 	resultCh chan string
 }
 
-func NewInput(interrupt chan os.Signal, exitKeys []keyboard.Key) chan string {
+func NewInput(interrupt chan os.Signal, exitKeys []keyboard.Key) (*Input, chan string) {
 	resultCh := make(chan string)
 	i := &Input{
 		resultCh: resultCh,
 	}
 
 	go i.readStdin(interrupt, exitKeys)
-	return resultCh
+	return i, resultCh
 }
 
 func (i *Input) readStdin(interrupt chan os.Signal, exitKeys []keyboard.Key) {
@@ -45,7 +45,7 @@ func (i *Input) readStdin(interrupt chan os.Signal, exitKeys []keyboard.Key) {
 		}
 		switch key {
 		case keyboard.KeyEnter:
-			clearLine()
+			ClearLine()
 			i.resultCh <- strings.TrimSpace(string(i.buf))
 			i.resetBuffer()
 		case keyboard.KeyBackspace2, keyboard.KeyBackspace:
@@ -58,11 +58,15 @@ func (i *Input) readStdin(interrupt chan os.Signal, exitKeys []keyboard.Key) {
 			i.buf = append(i.buf, char)
 		}
 		// print out
-		clearLine()
+		ClearLine()
 		fmt.Printf("%v", string(i.buf))
 	}
 }
 
 func (i *Input) resetBuffer() {
 	i.buf = []rune{}
+}
+
+func (i *Input) ResumeBuffer() {
+	fmt.Printf("%v", string(i.buf))
 }

@@ -76,12 +76,15 @@ func GroupChatProgram(username string) {
 	}
 
 	done := make(chan struct{})
-
 	// join room
-	err = joinRoom(c, username, room)
+	resp, err := joinRoom(c, username, room)
 	if err != nil {
 		panic(fmt.Sprintf("join room failed %v", err))
 	}
+	// input reader
+	inputi, ichan := input.NewInput(interrupt, []keyboard.Key{keyboard.KeyEsc, keyboard.KeyCtrlC})
+	handleReceiveMessage(inputi, resp)
+
 	// receive message from ws
 	go func() {
 		defer close(done)
@@ -94,12 +97,9 @@ func GroupChatProgram(username string) {
 				fmt.Println("err:", err)
 				return
 			}
-			handleReceiveMessage(message)
+			handleReceiveMessage(inputi, message)
 		}
 	}()
-
-	// input reader
-	ichan := input.NewInput(interrupt, []keyboard.Key{keyboard.KeyEsc, keyboard.KeyCtrlC})
 
 	ticker := time.NewTicker(time.Second) // heartbeat timer
 	defer ticker.Stop()
@@ -138,31 +138,32 @@ func GroupChatProgram(username string) {
 }
 
 // send join room action to server and wait for response
-func joinRoom(c *websocket.Conn, username, room string) error {
+func joinRoom(c *websocket.Conn, username, room string) ([]byte, error) {
 	c.WriteMessage(websocket.TextMessage, model.NewJoinRoomMessage(username, room).Encode())
 
 	fmt.Println("wait for server response...")
 	_, resp, err := c.ReadMessage()
 	if err != nil {
 		fmt.Println("err: ", err, resp)
-		return err
+		return nil, err
 	}
 	msg, err := model.Decode(resp)
 	if err != nil {
 		fmt.Println("error decoding message", err)
 	}
 	if msg.Action == model.JoinRoomSuccessAction {
-		handleReceiveMessage(resp)
-		return nil
+		return resp, nil
 	}
-	return fmt.Errorf("unexpcted response %v", msg)
+	return nil, fmt.Errorf("unexpcted response %v", msg)
 }
 
 // display default message on screen
-func handleReceiveMessage(rawMessage []byte) {
+func handleReceiveMessage(inputi *input.Input, rawMessage []byte) {
 	msg, err := model.Decode(rawMessage)
 	if err != nil {
 		fmt.Println("error decoding message", err)
 	}
+	input.ClearLine()
 	fmt.Printf("From %s: %s\n", msg.Sender, msg.Message)
+	inputi.ResumeBuffer()
 }
