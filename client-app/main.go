@@ -68,7 +68,7 @@ func main() {
 			return
 		}
 		if answers.Program == GROUP_CHAT {
-			groupchat.GroupChatProgram(answers.UserName)
+			groupchat.Run(answers.UserName)
 		}
 		if answers.Program == PRIVATE_CHAT {
 			fmt.Println("WIP")
