@@ -74,6 +74,11 @@ func GroupChatProgram(username string) rtn_code {
 	// input reader
 	inputi, ichan, doneCh := input.NewInput(interrupt, []keyboard.Key{keyboard.KeyEsc, keyboard.KeyCtrlC})
 	defer func() {
+		// prevent input from blocking infinitely
+		select {
+		case doneCh <- struct{}{}:
+		case <-time.After(time.Second):
+		}
 		close(doneCh)
 	}()
 	handleReceiveMessage(inputi, resp)

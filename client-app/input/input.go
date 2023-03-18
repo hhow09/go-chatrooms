@@ -37,7 +37,8 @@ func (i *Input) readStdin(interrupt chan os.Signal, exitKeys []keyboard.Key, don
 		default:
 			char, key, err := keyboard.GetSingleKey()
 			if err != nil {
-				panic(err)
+				fmt.Println(err)
+				return
 			}
 
 			// exit conditions
