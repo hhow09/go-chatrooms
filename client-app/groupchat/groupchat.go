@@ -152,6 +152,7 @@ func readPump(c *websocket.Conn, done chan rtn_code, inputi *input.Input) {
 				return
 			} else if err, ok := err.(net.Error); ok && err.Timeout() {
 				// handle timeout error
+				// set by c.SetReadDeadline in heartbeatSetup
 				fmt.Println("timeout error:", err)
 				done <- ERROR_EXIT
 				return
