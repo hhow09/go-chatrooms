@@ -1,6 +1,6 @@
 go 1.19
 
 use (
-    ./chatroom-channel
+    ./chatroom
     ./client-app
 )

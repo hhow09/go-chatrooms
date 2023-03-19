@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/hhow09/go-chatrooms/chatroom-channel/util"
+	"github.com/hhow09/go-chatrooms/chatroom/util"
 )
 
 const (
@@ -28,7 +28,7 @@ type Client struct {
 	roomActions  chan Message // send room action to server
 	ServerNotify chan string  // receive notification from server
 	Name         string
-	Room         *Room // a client can only join one room
+	Room         Room // a client can only join one room
 }
 
 func NewClient(conn *websocket.Conn, unregister chan *Client, broadcast chan Message, name string, roomActions chan Message) *Client {
@@ -68,7 +68,6 @@ func (c *Client) readMessage() {
 		return nil
 	})
 	for {
-		util.Log("client readMessage")
 		_, msg, err := c.conn.ReadMessage()
 		util.Log(fmt.Sprintf("received message: %s\n", string(msg)))
 		if err != nil {
