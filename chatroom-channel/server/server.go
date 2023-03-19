@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/gin-gonic/gin"
+	"github.com/go-redis/redis/v8"
 	"github.com/hhow09/go-chatrooms/chatroom-channel/model"
 	"github.com/hhow09/go-chatrooms/chatroom-channel/util"
 )
@@ -16,10 +17,11 @@ type WsServer struct {
 	broadcast   chan model.Message
 	roomActions chan model.Message
 	router      *gin.Engine
-	roomMap     map[string]*model.Room
+	roomMap     map[string]model.Room
+	redisClient *redis.Client
 }
 
-func NewWsServer() *WsServer {
+func NewWsServer(r *redis.Client) *WsServer {
 	router := gin.New()
 
 	s := &WsServer{
@@ -29,7 +31,8 @@ func NewWsServer() *WsServer {
 		broadcast:   make(chan model.Message),
 		roomActions: make(chan model.Message),
 		router:      router,
-		roomMap:     map[string]*model.Room{},
+		roomMap:     map[string]model.Room{},
+		redisClient: r,
 	}
 	s.router.GET("/ws", func(ctx *gin.Context) {
 		conn, name := WsHandler(ctx)
@@ -98,7 +101,7 @@ func (s *WsServer) broadcastToRoom(message model.Message) {
 	if !ok {
 		fmt.Println("cannot find sender (client): ", message.Sender)
 	}
-	room.Broadcast <- message
+	room.GetBroadcastChan() <- message
 }
 
 func (s *WsServer) handleRoomActions(message model.Message) {
@@ -129,9 +132,10 @@ func (s *WsServer) handleRoomActions(message model.Message) {
 	}
 }
 
-func (s *WsServer) createRoom(name string, private bool) *model.Room {
-	room := model.NewRoom(name, private)
+func (s *WsServer) createRoom(name string, private bool) model.Room {
+	room := model.NewRoom(name, private, s.redisClient)
+	room.Setup()
 	go room.Run()
-	s.roomMap[room.Name] = room
+	s.roomMap[room.GetName()] = room
 	return room
 }

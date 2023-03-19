@@ -28,7 +28,7 @@ type Client struct {
 	roomActions  chan Message // send room action to server
 	ServerNotify chan string  // receive notification from server
 	Name         string
-	Room         *Room // a client can only join one room
+	Room         Room // a client can only join one room
 }
 
 func NewClient(conn *websocket.Conn, unregister chan *Client, broadcast chan Message, name string, roomActions chan Message) *Client {
