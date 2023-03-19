@@ -36,7 +36,7 @@ func (room *RoomBasic) RegisterClientInRoom(client *Client, isNewRoom bool) {
 // remove client from the room
 func (room *RoomBasic) UnregisterClientInRoom(client *Client) {
 	delete(room.clients, client)
-	room.BroadcastToClientsInRoom(Message{Message: fmt.Sprintf(leavRoomMessage, client.Name, room.Name, len(room.clients)), Action: LeaveRoomAction})
+	room.BroadcastToClientsInRoom(Message{Message: fmt.Sprintf(leavRoomMessage, client.Name, room.Name), Action: LeaveRoomAction})
 }
 
 // broadcast to all client in room
@@ -49,7 +49,7 @@ func (room *RoomBasic) BroadcastToClientsInRoom(message Message) {
 
 // send notification to all clients in room that new client has joined.
 func (room *RoomBasic) NotifyClientJoined(client *Client, isNewRoom bool) {
-	content := fmt.Sprintf(welcomeMessage, client.GetName(), room.Name, len(room.clients))
+	content := fmt.Sprintf(welcomeMessage, client.GetName(), room.Name)
 	if isNewRoom {
 		content = "new room created. \n" + content
 	}
@@ -72,4 +72,8 @@ func (room *RoomBasic) GetId() string {
 
 func (room *RoomBasic) GetBroadcastChan() chan Message {
 	return room.Broadcast
+}
+
+func (room *RoomBasic) GetPrivate() bool {
+	return room.Private
 }

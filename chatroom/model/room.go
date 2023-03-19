@@ -7,8 +7,8 @@ import (
 	"github.com/google/uuid"
 )
 
-const welcomeMessage = "%s joined the room [%s]. currently %d user in room."
-const leavRoomMessage = "%s leaved the room [%s]. currently %d user in room."
+const welcomeMessage = "%s joined the room [%s]."
+const leavRoomMessage = "%s leaved the room [%s]."
 
 type Room interface {
 	Setup()
@@ -20,6 +20,7 @@ type Room interface {
 	GetName() string
 	GetId() string
 	GetBroadcastChan() chan Message
+	GetPrivate() bool
 }
 
 func NewRoom(name string, private bool, redisClient *redis.Client) Room {

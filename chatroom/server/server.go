@@ -1,12 +1,14 @@
 package server
 
 import (
+	"database/sql"
 	"fmt"
 	"os"
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redis/v8"
 	"github.com/hhow09/go-chatrooms/chatroom/model"
+	"github.com/hhow09/go-chatrooms/chatroom/repository"
 	"github.com/hhow09/go-chatrooms/chatroom/util"
 )
 
@@ -19,11 +21,12 @@ type WsServer struct {
 	router      *gin.Engine
 	roomMap     map[string]model.Room
 	redisClient *redis.Client
+	roomRepo    repository.RoomRepository
 }
 
-func NewWsServer(r *redis.Client) *WsServer {
+func NewWsServer(r *redis.Client, db *sql.DB) *WsServer {
 	router := gin.New()
-
+	roomRepo := repository.RoomRepository{Db: db}
 	s := &WsServer{
 		clientMap:   map[string]*model.Client{},
 		register:    make(chan *model.Client),
@@ -33,6 +36,7 @@ func NewWsServer(r *redis.Client) *WsServer {
 		router:      router,
 		roomMap:     map[string]model.Room{},
 		redisClient: r,
+		roomRepo:    roomRepo,
 	}
 	s.router.GET("/ws", func(ctx *gin.Context) {
 		conn, name := WsHandler(ctx)
@@ -42,11 +46,17 @@ func NewWsServer(r *redis.Client) *WsServer {
 		}
 	})
 	s.router.GET("/rooms", func(ctx *gin.Context) {
-		rooms := make([]string, 0, len(s.roomMap))
-		for roomName := range s.roomMap {
-			rooms = append(rooms, roomName)
+		// basic room
+		if repository.NotUsed(s.roomRepo) {
+			ctx.JSON(200, s.getAllRoomsOnServer())
+			return
 		}
-
+		fmt.Println("GetAllRooms")
+		rooms, err := s.roomRepo.GetAllRooms()
+		if err != nil {
+			ctx.JSON(404, err)
+			return
+		}
 		ctx.JSON(200, rooms)
 	})
 	return s
@@ -96,6 +106,7 @@ func (s *WsServer) broadcastToRoom(message model.Message) {
 	room, ok := s.roomMap[message.Target]
 	if !ok {
 		fmt.Println("cannot find room: ", message.Target)
+		return
 	}
 	_, ok = s.clientMap[message.Sender]
 	if !ok {
@@ -137,5 +148,14 @@ func (s *WsServer) createRoom(name string, private bool) model.Room {
 	room.Setup()
 	go room.Run()
 	s.roomMap[room.GetName()] = room
+	s.roomRepo.AddRoom(room)
 	return room
+}
+
+func (s *WsServer) getAllRoomsOnServer() []string {
+	rooms := make([]string, 0, len(s.roomMap))
+	for roomName := range s.roomMap {
+		rooms = append(rooms, roomName)
+	}
+	return rooms
 }

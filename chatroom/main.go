@@ -15,7 +15,9 @@ func init() {
 func main() {
 	redisc := lib.CreateRedisClient()
 	defer redisc.Close()
-	wsServer := server.NewWsServer(redisc)
+	db := lib.InitDB()
+	defer db.Close()
+	wsServer := server.NewWsServer(redisc, db)
 	go wsServer.ListenToClientEvents()
 	if err := wsServer.Run(); err != nil {
 		log.Fatal(err)

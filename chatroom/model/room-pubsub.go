@@ -50,7 +50,7 @@ func (room *RoomPubsub) RegisterClientInRoom(client *Client, isNewRoom bool) {
 // remove client from the room
 func (room *RoomPubsub) UnregisterClientInRoom(client *Client) {
 	delete(room.clients, client)
-	room.BroadcastToClientsInRoom(Message{Message: fmt.Sprintf(leavRoomMessage, client.Name, room.Name, len(room.clients)), Action: LeaveRoomAction})
+	room.BroadcastToClientsInRoom(Message{Message: fmt.Sprintf(leavRoomMessage, client.Name, room.Name), Action: LeaveRoomAction})
 }
 
 // broadcast to all client in room
@@ -66,7 +66,7 @@ func (room *RoomPubsub) BroadcastToClientsInRoom(message Message) {
 // send notification to all clients in room that new client has joined.
 func (room *RoomPubsub) NotifyClientJoined(client *Client, isNewRoom bool) {
 	util.Log("RoomPubsub.NotifyClientJoined", client.Name)
-	content := fmt.Sprintf(welcomeMessage, client.GetName(), room.Name, len(room.clients))
+	content := fmt.Sprintf(welcomeMessage, client.GetName(), room.Name)
 	if isNewRoom {
 		content = "new room created. \n" + content
 	}
@@ -102,4 +102,8 @@ func (room *RoomPubsub) subscribeToRoomMessages(ch <-chan *redis.Message) {
 			client.Send(m.encode())
 		}
 	}
+}
+
+func (room *RoomPubsub) GetPrivate() bool {
+	return room.Private
 }
