@@ -7,7 +7,7 @@ import (
 
 	"github.com/go-redis/redis/v8"
 	"github.com/google/uuid"
-	"github.com/hhow09/go-chatrooms/chatroom-channel/util"
+	"github.com/hhow09/go-chatrooms/chatroom/util"
 )
 
 type RoomPubsub struct {

@@ -22,7 +22,6 @@ type Room interface {
 	GetBroadcastChan() chan Message
 }
 
-// NewRoom creates a new RoomChannel
 func NewRoom(name string, private bool, redisClient *redis.Client) Room {
 	if os.Getenv("REDIS_PUBSUB") == "true" {
 		return &RoomPubsub{
@@ -34,7 +33,7 @@ func NewRoom(name string, private bool, redisClient *redis.Client) Room {
 			redisClient: redisClient,
 		}
 	}
-	return &RoomChannel{
+	return &RoomBasic{
 		ID:        uuid.New(),
 		Name:      name,
 		clients:   make(map[*Client]bool),

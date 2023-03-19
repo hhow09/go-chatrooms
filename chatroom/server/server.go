@@ -6,8 +6,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redis/v8"
-	"github.com/hhow09/go-chatrooms/chatroom-channel/model"
-	"github.com/hhow09/go-chatrooms/chatroom-channel/util"
+	"github.com/hhow09/go-chatrooms/chatroom/model"
+	"github.com/hhow09/go-chatrooms/chatroom/util"
 )
 
 type WsServer struct {

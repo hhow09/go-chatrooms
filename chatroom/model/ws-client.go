@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/hhow09/go-chatrooms/chatroom-channel/util"
+	"github.com/hhow09/go-chatrooms/chatroom/util"
 )
 
 const (
@@ -68,7 +68,6 @@ func (c *Client) readMessage() {
 		return nil
 	})
 	for {
-		util.Log("client readMessage")
 		_, msg, err := c.conn.ReadMessage()
 		util.Log(fmt.Sprintf("received message: %s\n", string(msg)))
 		if err != nil {

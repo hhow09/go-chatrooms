@@ -4,10 +4,10 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
-	"github.com/hhow09/go-chatrooms/chatroom-channel/util"
+	"github.com/hhow09/go-chatrooms/chatroom/util"
 )
 
-type RoomChannel struct {
+type RoomBasic struct {
 	ID        uuid.UUID `json:"id"`
 	Name      string    `json:"name"`
 	clients   map[*Client]bool
@@ -15,10 +15,10 @@ type RoomChannel struct {
 	Private   bool
 }
 
-func (room *RoomChannel) Setup() {}
+func (room *RoomBasic) Setup() {}
 
 // RunRoom runs our room, accepting various requests
-func (room *RoomChannel) Run() {
+func (room *RoomBasic) Run() {
 	for {
 		message := <-room.Broadcast
 		room.BroadcastToClientsInRoom(message)
@@ -27,28 +27,28 @@ func (room *RoomChannel) Run() {
 
 // add client to the room
 // then client can receivent the room broadcast
-func (room *RoomChannel) RegisterClientInRoom(client *Client, isNewRoom bool) {
-	util.Log("RoomChannel.registerClientInRoom")
+func (room *RoomBasic) RegisterClientInRoom(client *Client, isNewRoom bool) {
+	util.Log("RoomBasic.registerClientInRoom")
 	room.clients[client] = true
 	room.NotifyClientJoined(client, isNewRoom)
 }
 
 // remove client from the room
-func (room *RoomChannel) UnregisterClientInRoom(client *Client) {
+func (room *RoomBasic) UnregisterClientInRoom(client *Client) {
 	delete(room.clients, client)
 	room.BroadcastToClientsInRoom(Message{Message: fmt.Sprintf(leavRoomMessage, client.Name, room.Name, len(room.clients)), Action: LeaveRoomAction})
 }
 
 // broadcast to all client in room
-func (room *RoomChannel) BroadcastToClientsInRoom(message Message) {
-	util.Log("RoomChannel.BroadcastToClientsInRoom", message.Message)
+func (room *RoomBasic) BroadcastToClientsInRoom(message Message) {
+	util.Log("RoomBasic.BroadcastToClientsInRoom", message.Message)
 	for client := range room.clients {
 		client.Send(message.encode())
 	}
 }
 
 // send notification to all clients in room that new client has joined.
-func (room *RoomChannel) NotifyClientJoined(client *Client, isNewRoom bool) {
+func (room *RoomBasic) NotifyClientJoined(client *Client, isNewRoom bool) {
 	content := fmt.Sprintf(welcomeMessage, client.GetName(), room.Name, len(room.clients))
 	if isNewRoom {
 		content = "new room created. \n" + content
@@ -62,14 +62,14 @@ func (room *RoomChannel) NotifyClientJoined(client *Client, isNewRoom bool) {
 	room.BroadcastToClientsInRoom(msg)
 }
 
-func (room *RoomChannel) GetName() string {
+func (room *RoomBasic) GetName() string {
 	return room.Name
 }
 
-func (room *RoomChannel) GetId() string {
+func (room *RoomBasic) GetId() string {
 	return room.ID.String()
 }
 
-func (room *RoomChannel) GetBroadcastChan() chan Message {
+func (room *RoomBasic) GetBroadcastChan() chan Message {
 	return room.Broadcast
 }

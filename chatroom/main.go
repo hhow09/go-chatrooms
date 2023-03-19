@@ -3,8 +3,8 @@ package main
 import (
 	"log"
 
-	"github.com/hhow09/go-chatrooms/chatroom-channel/lib"
-	"github.com/hhow09/go-chatrooms/chatroom-channel/server"
+	"github.com/hhow09/go-chatrooms/chatroom/lib"
+	"github.com/hhow09/go-chatrooms/chatroom/server"
 	"github.com/joho/godotenv"
 )
 
