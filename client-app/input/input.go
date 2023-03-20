@@ -13,6 +13,10 @@ func ClearLine() {
 	fmt.Print("\033[u\033[K")
 }
 
+func (i *Input) BufLen() int {
+	return len(i.buf)
+}
+
 type Input struct {
 	buf      []rune
 	resultCh chan string
