@@ -1,10 +1,9 @@
 package model
 
 import (
-	"os"
-
 	"github.com/go-redis/redis/v8"
 	"github.com/google/uuid"
+	"github.com/hhow09/go-chatrooms/chatroom/util"
 )
 
 const welcomeMessage = "%s joined the room [%s]."
@@ -24,7 +23,7 @@ type Room interface {
 }
 
 func NewRoom(name string, private bool, redisClient *redis.Client) Room {
-	if os.Getenv("REDIS_PUBSUB") == "true" {
+	if util.IsPubsubEnv() {
 		return &RoomPubsub{
 			ID:          uuid.New(),
 			Name:        name,

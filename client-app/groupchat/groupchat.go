@@ -1,22 +1,20 @@
 package groupchat
 
 import (
-	"context"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
 	"net"
-	"net/http"
-	"net/url"
 	"os"
 	"os/signal"
 	"time"
 
 	"github.com/eiannone/keyboard"
 	"github.com/gorilla/websocket"
+	"github.com/hhow09/go-chatrooms/client-app/api"
 	"github.com/hhow09/go-chatrooms/client-app/input"
 	"github.com/hhow09/go-chatrooms/client-app/model"
+	"github.com/hhow09/go-chatrooms/client-app/prompts"
 )
 
 type rtn_code int
@@ -24,12 +22,6 @@ type rtn_code int
 const (
 	ERROR_EXIT rtn_code = 1
 	DONE_EXIT  rtn_code = 0
-)
-
-const (
-	pongWait   = 15 * time.Second    // short connection
-	pingPeriod = (pongWait * 9) / 10 // pingPeriod should less than pongWait
-	writeWait  = 10 * time.Second    // Max wait time when writing message to peer
 )
 
 // reconnect
@@ -60,14 +52,14 @@ func GroupChatProgram(username string) rtn_code {
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt)
 
-	c := wsSetup(username)
-	defer c.Close()
+	wc := api.NewWSClient(username)
+	defer wc.Close()
 
 	done := make(chan rtn_code)
 	defer close(done)
 	room := chooseRoom()
 	// join room
-	resp, err := joinRoom(c, username, room)
+	resp, err := joinRoom(wc.Conn, username, room)
 	if err != nil {
 		panic(fmt.Sprintf("join room failed %v", err))
 	}
@@ -83,22 +75,22 @@ func GroupChatProgram(username string) rtn_code {
 	}()
 	handleReceiveMessage(inputi, resp)
 
-	ticker := heartbeatSetup(c)
+	ticker := wc.HeartbeatSetup()
 	defer ticker.Stop()
 
-	go readPump(c, done, inputi)
+	go readPump(wc.Conn, done, inputi)
 	for {
 		select {
 		case code := <-done:
 			return code
 		case input := <-ichan: // input
-			err := c.WriteMessage(websocket.TextMessage, model.NewTextMessage(username, input, room).Encode())
+			err := wc.Conn.WriteMessage(websocket.TextMessage, model.NewTextMessage(username, input, room).Encode())
 			if err != nil {
 				log.Println("write:", err)
 				return ERROR_EXIT
 			}
 		case t := <-ticker.C: //heartbeat
-			err := c.WriteMessage(websocket.PingMessage, []byte(t.String()))
+			err := wc.Conn.WriteMessage(websocket.PingMessage, []byte(t.String()))
 			if err != nil {
 				log.Println("heartbeat error:", err)
 				return ERROR_EXIT
@@ -106,7 +98,7 @@ func GroupChatProgram(username string) rtn_code {
 		case <-interrupt: //os interrupt
 			// Cleanly close the connection by sending a close message and then
 			// waiting (with timeout) for the server to close the connection.
-			err := c.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
+			err := wc.Conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
 			if err != nil {
 				log.Println("write close:", err)
 				return DONE_EXIT
@@ -118,27 +110,6 @@ func GroupChatProgram(username string) rtn_code {
 			return DONE_EXIT
 		}
 	}
-}
-
-// setup ws connection
-func wsSetup(username string) *websocket.Conn {
-	u := url.URL{Scheme: "ws", Host: fmt.Sprintf("localhost:%s", os.Getenv("WEB_HOST")), Path: "/ws", RawQuery: fmt.Sprintf("name=%s", username)}
-	log.Printf("connecting to %s", u.String())
-	c, _, err := websocket.DefaultDialer.Dial(u.String(), nil)
-	if err != nil {
-		panic(fmt.Sprintf("dial:%v", err))
-	}
-
-	return c
-}
-
-func heartbeatSetup(c *websocket.Conn) *time.Ticker {
-	c.SetPongHandler(func(appData string) error {
-		c.SetReadDeadline(time.Now().Add(pongWait)) // update the wait time
-		return nil
-	})
-	c.SetReadDeadline(time.Now().Add(pongWait))
-	return time.NewTicker(pingPeriod) // heartbeat timer
 }
 
 // receive message from ws
@@ -191,39 +162,19 @@ func handleReceiveMessage(inputi *input.Input, rawMessage []byte) {
 	if err != nil {
 		fmt.Println("error decoding message", err)
 	}
-	input.ClearLine()
+	if inputi.BufLen() > 0 {
+		input.ClearLine()
+	}
 	fmt.Printf("From %s: %s\n", msg.Sender, msg.Message)
 	inputi.ResumeBuffer()
 }
 
-func getRoomList() ([]string, error) {
-	u := url.URL{Scheme: "http", Host: fmt.Sprintf("localhost:%s", os.Getenv("WEB_HOST")), Path: "/rooms"}
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, u.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-	res, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	if res.StatusCode != 200 {
-		return nil, fmt.Errorf("Non-OK HTTP status: %v", res.StatusCode)
-	}
-	defer res.Body.Close()
-	var rommlist []string
-	err = json.NewDecoder(res.Body).Decode(&rommlist)
-	if err != nil {
-		return nil, err
-	}
-	return rommlist, nil
-}
-
 // choose room or create room with prompt
 func chooseRoom() (room string) {
-	roomList, _ := getRoomList()
-	ans1 := ChooseRoomPrompt(roomList)
-	if ans1.Room == OPTION_CREATE_ROOM || ans1.Room == "" {
-		room = CreateRoomPrompt().Room
+	roomList, _ := api.GetRoomList()
+	ans1 := prompts.ChooseRoom(roomList)
+	if ans1.Room == prompts.OPTION_CREATE_ROOM || ans1.Room == "" {
+		room = prompts.CreateRoom().Room
 	} else {
 		room = ans1.Room
 	}
