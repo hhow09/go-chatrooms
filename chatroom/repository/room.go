@@ -8,9 +8,8 @@ import (
 	"github.com/hhow09/go-chatrooms/chatroom/util"
 )
 
-// for basic room
-func NotUsed(r RoomRepository) bool {
-	return r.Db == nil
+func (repo *RoomRepository) notUsed() bool {
+	return repo.Db == nil
 }
 
 type RoomRepository struct {
@@ -18,7 +17,7 @@ type RoomRepository struct {
 }
 
 func (repo *RoomRepository) AddRoom(room model.Room) {
-	if NotUsed(*repo) {
+	if repo.notUsed() {
 		return
 	}
 	stmt, err := repo.Db.Prepare("INSERT OR IGNORE INTO room(name, private) values(?,?)")
@@ -29,7 +28,7 @@ func (repo *RoomRepository) AddRoom(room model.Room) {
 }
 
 func (repo *RoomRepository) FindRoomByName(name string, redisClient *redis.Client) model.Room {
-	if NotUsed(*repo) {
+	if repo.notUsed() {
 		return nil
 	}
 	row := repo.Db.QueryRow("SELECT name, private FROM room where name = ? LIMIT 1", name)
@@ -47,7 +46,7 @@ func (repo *RoomRepository) FindRoomByName(name string, redisClient *redis.Clien
 }
 
 func (repo *RoomRepository) GetAllRooms() ([]string, error) {
-	if NotUsed(*repo) {
+	if repo.notUsed() {
 		return nil, nil
 	}
 	rows, err := repo.Db.Query("SELECT name FROM room")

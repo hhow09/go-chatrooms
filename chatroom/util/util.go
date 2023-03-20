@@ -10,3 +10,7 @@ func Log(s ...string) {
 		fmt.Println("[Log]", s)
 	}
 }
+
+func IsPubsubEnv() bool {
+	return os.Getenv("REDIS_PUBSUB") == "true"
+}

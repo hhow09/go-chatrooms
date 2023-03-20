@@ -47,7 +47,7 @@ func NewWsServer(r *redis.Client, db *sql.DB) *WsServer {
 	})
 	s.router.GET("/rooms", func(ctx *gin.Context) {
 		// basic room
-		if repository.NotUsed(s.roomRepo) {
+		if !util.IsPubsubEnv() {
 			ctx.JSON(200, s.getAllRoomsOnServer())
 			return
 		}
