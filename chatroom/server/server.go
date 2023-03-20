@@ -51,7 +51,6 @@ func NewWsServer(r *redis.Client, db *sql.DB) *WsServer {
 			ctx.JSON(200, s.getAllRoomsOnServer())
 			return
 		}
-		fmt.Println("GetAllRooms")
 		rooms, err := s.roomRepo.GetAllRooms()
 		if err != nil {
 			ctx.JSON(404, err)

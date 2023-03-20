@@ -1,18 +1,34 @@
 # Chatroom
 
+## API
+### Websocket Endpoint
+`ws://localhost:8000/ws`
+
+### Get Room List
+GET `http://localhost:8000/rooms`
+
 ## basic room
-### Features
-- a room is only be in 1 server
-- a room can only publish to clients connecting to same server
+- [model/room-basic.go](./model/room-basic.go)
+
+![architecture-single-server](./doc/architecture-single-server.png)
+
 ### How to run ?
 1. `make start-server`
 2. `make start-client`
 
+### Limitations
+- a room only visible to 1 server (not scalable)
+- a room can send messages to clients on same server.
 
-## room with pubsub broadcast
+
+## scaling with [Redis Pub/Sub](https://redis.io/docs/manual/pubsub/)
+- [model/room-pubsub.go](./model/room-pubsub.go)
+
+![architecture-redis-pub-sub](./doc/architecture-redis-pub-sub.png)
+
 ### Features
-- a room can be on multiple server (TODO)
-- a room can publish to different clients on different server
+- scaling: a room can be on multiple servers
+- pubsub: a room can publish / subscribe to different clients connecting to different servers.
 
 ### How to run ?
 1. `make start-redis` 
